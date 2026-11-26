@@ -15,6 +15,7 @@
   };
   const TYPE_LABEL = { mc: 'Multiple choice', qc: 'Quantitative comparison', multi: 'Select all that apply', num: 'Numeric entry', grid: 'Student-produced response' };
   const DIFF_LABEL = { 1: 'Easy', 2: 'Medium', 3: 'Hard' };
+  const LESSONS = window.GRE_LESSONS || [];
   const byId = {};
   for (const ex of ['gre', 'sat']) for (const p of BANKS[ex]) { p.exam = ex; byId[p.id] = p; }
 
@@ -22,8 +23,8 @@
   const KEY = 'qp_v1';
   let store = loadStore();
   function loadStore() {
-    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.att) return Object.assign({ att: {}, flags: {}, hist: [], days: {} }, s); } catch (e) { /* ignore */ }
-    return { att: {}, flags: {}, hist: [], days: {} };
+    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.att) return Object.assign({ att: {}, flags: {}, hist: [], days: {}, learn: {} }, s); } catch (e) { /* ignore */ }
+    return { att: {}, flags: {}, hist: [], days: {}, learn: {} };
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) { /* ignore */ } }
   const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -115,7 +116,7 @@
   let S = null, timerId = null;
   function startSession(o) {
     if (!o.ids.length) { toast('No questions match those filters.'); return; }
-    S = { exam: o.exam, mode: o.mode || 'practice', title: o.title, ids: o.ids, i: 0, resp: {}, checked: {}, flags: {}, start: Date.now(), limit: o.limit || null, done: false, elapsed: 0 };
+    S = { exam: o.exam, mode: o.mode || 'practice', title: o.title, ids: o.ids, i: 0, resp: {}, checked: {}, flags: {}, start: Date.now(), limit: o.limit || null, done: false, elapsed: 0, lesson: o.lesson };
     location.hash = '#/quiz';
     if (location.hash === '#/quiz') route();
   }
@@ -133,6 +134,10 @@
     store.hist.unshift({ exam: S.exam, title: S.title, mode: S.mode, date: Date.now(), total: S.ids.length, correct, secs: Math.round(S.elapsed) });
     store.hist = store.hist.slice(0, 60); save();
     S.correct = correct;
+    if (S.lesson != null) {
+      const sc = pct(correct, S.ids.length), prev = store.learn[S.lesson] || {};
+      store.learn[S.lesson] = { done: true, best: Math.max(prev.best || 0, sc), last: sc, date: Date.now() }; save();
+    }
     location.hash = '#/results';
   }
 
@@ -142,11 +147,12 @@
     clearInterval(timerId);
     const h = location.hash.replace(/^#\/?/, '');
     const [a, b] = h.split('/');
-    document.body.classList.toggle('sat-theme', a === 'sat' || (b === 'sat') || (S && S.exam === 'sat' && (a === 'quiz' || a === 'results')));
+    document.body.classList.toggle('sat-theme', a !== 'learn' && (a === 'sat' || (b === 'sat') || (S && S.exam === 'sat' && (a === 'quiz' || a === 'results'))));
     window.scrollTo(0, 0);
     if (a === 'gre' || a === 'sat') { setNav(a); return viewExam(a); }
     if (a === 'bank' && EXAMS[b]) { setNav(b); return viewBank(b); }
     if (a === 'stats') { setNav('stats'); return viewStats(); }
+    if (a === 'learn' && LESSONS.length) { setNav('learn'); return b != null && LESSONS[+b - 1] ? viewLesson(+b - 1) : viewLearn(); }
     if (a === 'quiz' && S) { setNav(S.exam); return viewQuiz(); }
     if (a === 'results' && S && S.done) { setNav(S.exam); return viewResults(); }
     setNav(''); viewHome();
@@ -172,7 +178,7 @@
     </section>
     <div class="section-title"><h2>Choose your exam</h2></div>
     <div class="grid g2">
-      ${examCard('gre', g, ['Quantitative Comparison, multiple choice, select-all and numeric entry', 'Arithmetic, Algebra, Geometry, Data Analysis', 'Timed sections at real GRE pacing'])}
+      ${examCard('gre', g, ['30-day study plan: one lesson and exercise set per day', 'Quantitative Comparison, multiple choice, select-all and numeric entry', 'Arithmetic, Algebra, Geometry, Data Analysis', 'Timed sections at real GRE pacing'])}
       ${examCard('sat', s, ['Multiple choice and student-produced responses (grid-ins)', 'Algebra, Advanced Math, Problem Solving & Data, Geometry & Trig', 'Digital SAT module pacing (22 questions / 35 min)'])}
     </div>
     <div class="section-title"><h2>Built for real progress</h2></div>
@@ -216,6 +222,7 @@
         <div class="card stat"><b>${missed.length}</b><span>to review (last try wrong)</span></div>
         <div class="card stat"><b>${streak()}</b><span>day streak</span></div>
       </div>
+      ${ex === 'gre' && LESSONS.length ? learnBanner() : ''}
       <div class="section-title"><h2>Practice modes</h2></div>
       <div class="grid g3">
         <button class="card mode" data-act="quick"><span class="ic">⚡</span><h3>Quick 10</h3><p>Ten mixed questions you haven't seen yet, with instant feedback.</p></button>
@@ -427,7 +434,7 @@
           <div class="row">
             <a class="btn ${S.exam === 'sat' ? 'sat' : ''}" href="#/quiz" id="reviewBtn">Review answers</a>
             ${missedIds.length ? `<button class="btn ghost" id="retryBtn">Retry ${missedIds.length} missed</button>` : ''}
-            <a class="btn ghost" href="#/${S.exam}">Back to ${e.short} dashboard</a>
+            ${S.lesson != null ? (LESSONS[S.lesson + 1] ? `<a class="btn ghost" href="#/learn/${S.lesson + 2}">Next lesson: Day ${S.lesson + 2} →</a>` : '<a class="btn ghost" href="#/learn">Study plan complete 🎉</a>') + `<a class="btn ghost" href="#/learn/${S.lesson + 1}">Back to lesson</a>` : `<a class="btn ghost" href="#/${S.exam}">Back to ${e.short} dashboard</a>`}
           </div>
         </div>
       </div>
@@ -442,6 +449,83 @@
       if (ev.target.id === 'reviewBtn') S.i = 0;
       if (ev.target.id === 'retryBtn') startSession({ exam: S.exam, title: 'Retry missed', ids: missedIds });
     };
+  }
+
+  // ----- learn -----
+  const nextLesson = () => { const i = LESSONS.findIndex((_, k) => !(store.learn[k] && store.learn[k].done)); return i < 0 ? null : i; };
+  const lessonPool = (i) => BANKS.gre.filter((p) => LESSONS[i].tpl.includes(p.tpl));
+  const doneCount = () => LESSONS.filter((_, k) => store.learn[k] && store.learn[k].done).length;
+  const AREA_IC = { Arithmetic: '🔢', Algebra: '✖️', Geometry: '📐', 'Data Analysis': '📊', Strategy: '🧠' };
+  function learnBanner() {
+    const n = nextLesson(), done = doneCount();
+    return `<a class="card learn-banner" href="#/learn${n == null ? '' : '/' + (n + 1)}">
+      <div class="lb-ic">📚</div>
+      <div style="flex:1;min-width:0"><div class="tiny">30-day study plan · ${done}/${LESSONS.length} days done</div>
+      <b>${n == null ? 'All lessons complete. Review any day.' : `Today: Day ${n + 1} · ${esc(LESSONS[n].title)}`}</b>
+      <div class="bar" style="margin-top:8px"><i style="width:${pct(done, LESSONS.length)}%"></i></div></div>
+      <span class="btn sm">${n == null ? 'Open plan' : done ? 'Continue →' : 'Start →'}</span></a>`;
+  }
+  function viewLearn() {
+    const n = nextLesson(), done = doneCount();
+    const weeks = []; for (let i = 0; i < LESSONS.length; i += 7) weeks.push([i, Math.min(i + 7, LESSONS.length)]);
+    const weekName = ['Week 1 · Arithmetic foundations', 'Week 2 · Algebra', 'Week 3 · Word problems, QC & triangles', 'Week 4 · Geometry & statistics', 'Week 5 · Counting & probability'];
+    app.innerHTML = `
+      <div class="dash-head">
+        <div class="logo" style="width:56px;height:56px;font-size:24px;border-radius:16px">📚</div>
+        <div><h1>GRE Quant · 30-day plan</h1><div class="muted">One topic a day: read the lesson, then do the exercises.</div></div>
+      </div>
+      <div class="card pad learn-hero">
+        <div style="flex:1;min-width:240px">
+          <div class="tiny">${done} of ${LESSONS.length} days complete</div>
+          <div class="bar" style="margin:8px 0 16px;height:10px"><i style="width:${pct(done, LESSONS.length)}%"></i></div>
+          ${n == null ? '<h2>🎉 You finished the plan!</h2><p class="muted">Now take timed sections to build speed, and go back to any lesson where your score was low.</p><a class="btn" href="#/gre">Go to timed sections</a>'
+            : `<span class="pill gre">Today · Day ${n + 1}</span><h2 style="margin:10px 0 6px">${esc(LESSONS[n].title)}</h2><p class="muted" style="margin:0 0 16px">${LESSONS[n].intro}</p><a class="btn" href="#/learn/${n + 1}">Start today's lesson →</a>`}
+        </div>
+      </div>
+      ${weeks.map(([a, b], w) => `<div class="section-title"><h2>${weekName[w] || 'Week ' + (w + 1)}</h2></div>
+        <div class="grid g3">${LESSONS.slice(a, b).map((l, j) => { const i = a + j, st = store.learn[i];
+          return `<a class="card day-card ${st && st.done ? 'done' : ''} ${i === n ? 'next' : ''}" href="#/learn/${i + 1}">
+            <div class="row"><span class="day-num">${st && st.done ? '✓' : i + 1}</span><span class="tiny">Day ${i + 1} · ${AREA_IC[l.area] || ''} ${l.area}</span></div>
+            <h3>${esc(l.title)}</h3>
+            <span class="tiny">${st && st.done ? (st.best ? `Best score ${st.best}%` : 'Marked as learned') : i === n ? 'Up next' : `${Math.min(12, lessonPool(i).length)} exercises`}</span></a>`; }).join('')}</div>`).join('')}`;
+    math(app);
+  }
+  function viewLesson(i) {
+    const l = LESSONS[i], st = store.learn[i], pool = lessonPool(i);
+    const seen = pool.filter((p) => store.att[p.id]).length;
+    app.innerHTML = `
+      <div class="row" style="margin-bottom:14px"><a class="btn ghost sm" href="#/learn">← Study plan</a><span class="spacer"></span>
+        ${i > 0 ? `<a class="btn ghost sm" href="#/learn/${i}">← Day ${i}</a>` : ''}${LESSONS[i + 1] ? `<a class="btn ghost sm" href="#/learn/${i + 2}">Day ${i + 2} →</a>` : ''}</div>
+      <div class="lesson">
+        <article class="card lesson-body">
+          <div class="qmeta"><span class="pill gre">Day ${i + 1} of ${LESSONS.length}</span><span class="pill">${AREA_IC[l.area] || ''} ${l.area}</span>${st && st.done ? `<span class="pill ok">✓ Completed${st.best ? ' · best ' + st.best + '%' : ''}</span>` : ''}</div>
+          <h1>${esc(l.title)}</h1>
+          <p class="lead">${l.intro}</p>
+          <h2>Key ideas</h2>
+          <div class="keys">${l.keys.map(([h, b], k) => `<div class="key"><div class="key-n">${k + 1}</div><div><h4>${h}</h4><p>${b}</p></div></div>`).join('')}</div>
+          <h2>Worked example</h2>
+          <div class="example"><p><b>Question.</b> ${l.example.q}</p>
+            <div id="sol" hidden><p><b>Solution.</b> ${l.example.a}</p></div>
+            <button class="btn ghost sm" id="solBtn">Show solution</button></div>
+          <h2>Common traps</h2>
+          <ul class="traps">${l.traps.map((t) => `<li>${t}</li>`).join('')}</ul>
+          <div class="tipbox"><b>💡 Strategy tip.</b> ${l.tip}</div>
+          <div class="row" style="margin-top:26px"><button class="btn" data-practice>✍️ Start today's exercises</button></div>
+        </article>
+        <aside class="card side lesson-side">
+          <h4>Today's exercises</h4>
+          <p class="muted" style="margin:0 0 14px;font-size:14.5px">12 questions on this topic, with instant feedback and a worked solution for each.</p>
+          <button class="btn" data-practice style="width:100%">✍️ Start exercises</button>
+          <div class="tiny" style="margin-top:12px">${pool.length} questions available for this topic · ${seen} attempted${st && st.done && st.best ? ` · last score ${st.last}%` : ''}</div>
+          <div class="tiny" style="margin-top:6px">Finishing the set marks Day ${i + 1} as complete. Aim for 80% or more before moving on; you can repeat the set for new questions.</div>
+          <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+          <button class="btn ghost sm" id="markBtn" style="width:100%">${st && st.done ? 'Mark as not done' : 'Mark as learned'}</button>
+        </aside>
+      </div>`;
+    math(app);
+    $('#solBtn').onclick = (ev) => { $('#sol').hidden = false; ev.target.remove(); };
+    $$('[data-practice]').forEach((b) => { b.onclick = () => startSession({ exam: 'gre', title: `Day ${i + 1}: ${l.title}`, ids: pickIds(pool, 12), lesson: i }); });
+    $('#markBtn').onclick = () => { if (st && st.done) delete store.learn[i]; else store.learn[i] = { done: true, best: 0, last: 0, date: Date.now() }; save(); viewLesson(i); };
   }
 
   // ----- bank -----
@@ -513,7 +597,7 @@
       <div class="grid g2" style="margin-top:18px">${['gre', 'sat'].map((ex) => { const st = examStats(ex); return `<div class="card ${ex === 'sat' ? 'sat-theme' : ''}"><div class="pad" style="padding-bottom:8px"><div class="row"><span class="pill ${ex}">${EXAMS[ex].short}</span><b>${EXAMS[ex].name}</b><span class="spacer"></span><span class="tiny">${st.seen}/${st.total} attempted · ${st.attempts ? st.acc + '% accuracy' : 'no attempts yet'}</span></div></div>${EXAMS[ex].topics.map((t) => { const x = st.topics[t]; return `<div class="topic-row" style="grid-template-columns:1fr 90px 50px"><div class="name">${t}<small>${x.seen}/${x.total} attempted</small></div><div class="bar"><i style="width:${pct(x.c, x.n)}%"></i></div><div class="acc">${x.n ? pct(x.c, x.n) + '%' : '—'}</div></div>`; }).join('')}</div>`; }).join('')}</div>
       <div class="section-title"><h2>Recent sessions</h2></div>
       <div class="card">${store.hist.length ? store.hist.slice(0, 25).map((h) => `<div class="review-item" style="cursor:default"><span class="st ${pct(h.correct, h.total) >= 70 ? 'ok' : 'bad'}">${pct(h.correct, h.total)}</span><div><div class="pv" style="color:var(--ink)"><span class="pill ${h.exam}">${EXAMS[h.exam].short}</span> ${esc(h.title)} · ${h.mode === 'test' ? 'Timed' : 'Practice'}</div><span class="tiny">${new Date(h.date).toLocaleString()} · ${h.correct}/${h.total} correct · ${fmtTime(h.secs)}</span></div><span></span></div>`).join('') : '<div class="empty"><div class="big">📊</div><p>Finish a practice set and your sessions will appear here.</p></div>'}</div>`;
-    $('#resetBtn').onclick = () => { if (confirm('Erase all saved progress, flags and history in this browser? This cannot be undone.')) { store = { att: {}, flags: {}, hist: [], days: {} }; save(); toast('Progress reset'); viewStats(); } };
+    $('#resetBtn').onclick = () => { if (confirm('Erase all saved progress, flags and history in this browser? This cannot be undone.')) { store = { att: {}, flags: {}, hist: [], days: {}, learn: {} }; save(); toast('Progress reset'); viewStats(); } };
   }
 
   // ---------- theme ----------

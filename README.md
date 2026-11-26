@@ -5,6 +5,7 @@ A free, static practice site with **1,374 GRE Quantitative** and **1,256 SAT Mat
 **Live site:** https://abdellaalimech.github.io/quantprep/
 
 ## Features
+- **30-day GRE study plan (Learn):** one topic per day, with key ideas, a worked example, common traps and a set of 12 exercises; progress is tracked per day
 - **GRE question formats:** Quantitative Comparison, multiple choice (5 options), select-all-that-apply, numeric entry
 - **SAT question formats:** multiple choice (4 options) and student-produced responses (grid-ins)
 - **Practice mode:** check each answer and read the worked solution right away
