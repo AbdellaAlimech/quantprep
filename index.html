@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QuantPrep — GRE Quant & SAT Math Practice</title>
+  <meta name="description" content="Free practice for GRE Quantitative Reasoning and SAT Math: 2,600+ problems with step-by-step explanations, timed sections, topic drills and progress tracking.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='16' fill='%235b5bf7'/><text x='32' y='44' font-size='34' text-anchor='middle' fill='white' font-family='Arial' font-weight='700'>∑</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="assets/style.css">
+  <script>try{const t=localStorage.getItem('qp_theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-in">
+      <a class="brand" href="#/"><span class="logo">∑</span><span>Quant<b>Prep</b></span></a>
+      <nav class="nav" id="nav">
+        <a href="#/gre" data-nav="gre">GRE<span class="hide-sm"> Quant</span></a>
+        <a href="#/sat" data-nav="sat">SAT<span class="hide-sm"> Math</span></a>
+        <a href="#/stats" data-nav="stats">Progress</a>
+      </nav>
+      <button class="icon-btn" id="themeBtn" title="Toggle dark mode" aria-label="Toggle dark mode">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path class="moon" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+    </div>
+  </header>
+  <main id="app" class="wrap"></main>
+  <footer class="foot wrap">
+    <span>QuantPrep · free, original practice problems with worked solutions. Not affiliated with ETS or the College Board. GRE® and SAT® are registered trademarks of their owners.</span>
+  </footer>
+  <div id="toast" class="toast" role="status"></div>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+  <script defer src="data/gre.js"></script>
+  <script defer src="data/sat.js"></script>
+  <script defer src="assets/app.js"></script>
+</body>
+</html>
