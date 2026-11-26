@@ -18,7 +18,7 @@ window.GRE_LESSONS = [
   tip: 'When a question says “integer”, remember it can be negative or zero unless it says “positive”.',
 },
 {
-  title: 'Remainders, units digits & multiples', area: 'Arithmetic', tpl: ['remainders', 'unitsDigit', 'inclusionExclusion'],
+  title: 'Remainders, units digits & multiples', area: 'Arithmetic', tpl: ['remainders', 'unitsDigit', 'inclusionExclusion', 'hNotDivisible', 'hCRT'],
   intro: 'Remainder questions look scary but follow one simple form. Units digits repeat in short cycles.',
   keys: [
     ['Division form', R`“\(n\) divided by \(d\) leaves remainder \(r\)” means \(n = dq + r\) with \(0 \le r < d\). Pick the smallest example, \(n = r\), to test answers fast.`],
@@ -58,7 +58,7 @@ window.GRE_LESSONS = [
   tip: 'Use 100 as the starting value whenever a question gives no actual number.',
 },
 {
-  title: 'Successive percents, discounts & interest', area: 'Arithmetic', tpl: ['successivePercent', 'discountTax', 'compoundInterest'],
+  title: 'Successive percents, discounts & interest', area: 'Arithmetic', tpl: ['successivePercent', 'discountTax', 'compoundInterest', 'hRevenue', 'hInterestDiff'],
   intro: 'When percents are applied one after another, they multiply. That one idea solves this whole topic.',
   keys: [
     ['Chain multipliers', R`Up 20% then down 20%: \(1.2 \times 0.8 = 0.96\), a net <b>4% decrease</b>, not 0%.`],
@@ -98,7 +98,7 @@ window.GRE_LESSONS = [
   tip: R`Memorize powers: \(2^1\) to \(2^{10}\), \(3^1\) to \(3^5\), and the squares up to \(15^2\).`,
 },
 {
-  title: 'Consecutive integers & sequences', area: 'Arithmetic', tpl: ['consecutive', 'sequences'],
+  title: 'Consecutive integers & sequences', area: 'Arithmetic', tpl: ['consecutive', 'sequences', 'hMultSum'],
   intro: 'Evenly spaced numbers have a shortcut: the average equals the middle value.',
   keys: [
     ['Evenly spaced sets', R`Average = (first + last) ÷ 2 = middle term. Sum = average × number of terms.`],
@@ -163,7 +163,7 @@ window.GRE_LESSONS = [
   tip: R`When you see \(x^2 - y^2\) or \((x + y)^2\) in a question, factor or expand it right away.`,
 },
 {
-  title: 'Algebraic identities & exponential equations', area: 'Algebra', tpl: ['recipSquares', 'expEq'],
+  title: 'Algebraic identities & exponential equations', area: 'Algebra', tpl: ['recipSquares', 'expEq', 'hExpFactor'],
   intro: R`Some algebra questions are designed to be solved without finding \(x\) at all.`,
   keys: [
     ['Square the expression', R`If \(x + \frac{1}{x} = k\), then \(x^2 + \frac{1}{x^2} = k^2 - 2\) (square both sides; the middle term is 2).`],
@@ -189,7 +189,7 @@ window.GRE_LESSONS = [
   tip: 'Always put substituted values in parentheses.',
 },
 {
-  title: 'Coordinate geometry', area: 'Algebra', tpl: ['coordinate'],
+  title: 'Coordinate geometry', area: 'Algebra', tpl: ['coordinate', 'hIntercepts'],
   intro: 'Lines in the xy-plane combine algebra and geometry.',
   keys: [
     ['Slope', R`\(m = \frac{y_2 - y_1}{x_2 - x_1}\) (rise over run). A horizontal line has slope 0; a vertical line has undefined slope.`],
@@ -202,7 +202,7 @@ window.GRE_LESSONS = [
   tip: 'A distance question is a Pythagorean theorem question. Look for triples like 3-4-5 and 5-12-13.',
 },
 {
-  title: 'Rates, speed & word problems', area: 'Arithmetic', tpl: ['avgSpeed', 'ages'],
+  title: 'Rates, speed & word problems', area: 'Arithmetic', tpl: ['avgSpeed', 'ages', 'hMeet'],
   intro: 'Distance = rate × time, plus careful translation of the words into equations.',
   keys: [
     ['D = RT', R`Distance = rate × time. Make sure the units match (minutes vs hours).`],
@@ -215,7 +215,7 @@ window.GRE_LESSONS = [
   tip: 'Make a small table with columns Rate | Time | Distance for each part of the trip.',
 },
 {
-  title: 'Work rates', area: 'Arithmetic', tpl: ['work'],
+  title: 'Work rates', area: 'Arithmetic', tpl: ['work', 'hWorkStop'],
   intro: 'Work problems are rate problems where the “distance” is one job.',
   keys: [
     ['Rates add', R`If A finishes a job in \(a\) hours, A's rate is \(\frac{1}{a}\) of the job per hour. Together: \(\frac{1}{a} + \frac{1}{b} = \frac{1}{t}\).`],
@@ -228,7 +228,7 @@ window.GRE_LESSONS = [
   tip: 'If your “together” answer is larger than either worker\'s time alone, you made a mistake.',
 },
 {
-  title: 'Mixtures', area: 'Arithmetic', tpl: ['mixture'],
+  title: 'Mixtures', area: 'Arithmetic', tpl: ['mixture', 'hReplace'],
   intro: 'Mixture problems track the amount of one ingredient. That amount stays the same when you add water.',
   keys: [
     ['Amount of ingredient', R`Amount of solute = concentration × volume. 20 L of 15% salt water holds 3 L of salt.`],
@@ -241,7 +241,7 @@ window.GRE_LESSONS = [
   tip: 'Write the amount of the ingredient before and after; it stays the same in a dilution.',
 },
 {
-  title: 'Quantitative Comparison strategy', area: 'Strategy', tpl: ['qcFamily'],
+  title: 'Quantitative Comparison strategy', area: 'Strategy', tpl: ['qcFamily', 'hQC'],
   intro: 'About a third of GRE quant questions are Quantitative Comparisons. They reward smart number testing more than long calculations.',
   keys: [
     ['The four answers', R`(A) A is always greater, (B) B is always greater, (C) always equal, (D) it depends. If the quantities are plain numbers with no variables, (D) is impossible.`],
@@ -294,7 +294,7 @@ window.GRE_LESSONS = [
   tip: 'Find each exterior angle with 360 ÷ n, then the interior angle is 180 minus that.',
 },
 {
-  title: 'Circles', area: 'Geometry', tpl: ['circleAC', 'arcSector', 'qcCircle'],
+  title: 'Circles', area: 'Geometry', tpl: ['circleAC', 'arcSector', 'qcCircle', 'hInscribed'],
   intro: 'Circle questions use just a few formulas. Usually you find the radius first.',
   keys: [
     ['Basics', R`Circumference \(C = 2\pi r = \pi d\). Area \(A = \pi r^2\).`],
@@ -320,7 +320,7 @@ window.GRE_LESSONS = [
   tip: 'Write the formula first, then substitute the numbers.',
 },
 {
-  title: 'Mean, median, mode & range', area: 'Data Analysis', tpl: ['centerSpread', 'averageRemove', 'nextScore', 'qcMeanMedian', 'freqTable'],
+  title: 'Mean, median, mode & range', area: 'Data Analysis', tpl: ['centerSpread', 'averageRemove', 'nextScore', 'qcMeanMedian', 'freqTable', 'hMaxLargest'],
   intro: 'Statistics questions are mostly about these four measures. The sum is your most powerful tool.',
   keys: [
     ['Mean', R`Mean = sum ÷ count, so <b>sum = mean × count</b>. Use this to find a missing or removed value.`],
@@ -334,7 +334,7 @@ window.GRE_LESSONS = [
   tip: 'Whenever you see “average”, write sum = average × count.',
 },
 {
-  title: 'Weighted averages', area: 'Data Analysis', tpl: ['weightedAvg'],
+  title: 'Weighted averages', area: 'Data Analysis', tpl: ['weightedAvg', 'hRatioAvg'],
   intro: 'When groups have different sizes, larger groups count more.',
   keys: [
     ['Formula', R`\(\bar{x} = \dfrac{n_1 \bar{x}_1 + n_2 \bar{x}_2}{n_1 + n_2}\).`],
@@ -372,7 +372,7 @@ window.GRE_LESSONS = [
   tip: 'On data questions, estimate first; the answer choices are often far apart.',
 },
 {
-  title: 'Counting: permutations & combinations', area: 'Data Analysis', tpl: ['combinatorics', 'qcCombos'],
+  title: 'Counting: permutations & combinations', area: 'Data Analysis', tpl: ['combinatorics', 'qcCombos', 'hCommittee'],
   intro: 'The key question is always: does order matter?',
   keys: [
     ['Counting principle', R`For independent choices, multiply: 3 shirts × 4 pants = 12 outfits.`],
@@ -385,7 +385,7 @@ window.GRE_LESSONS = [
   tip: 'Different titles or positions → order matters. A plain group or team → it doesn\'t.',
 },
 {
-  title: 'Probability & overlapping sets', area: 'Data Analysis', tpl: ['probability', 'venn'],
+  title: 'Probability & overlapping sets', area: 'Data Analysis', tpl: ['probability', 'venn', 'hAtLeastOne'],
   intro: 'Probability = favorable outcomes ÷ total outcomes, plus a few rules for combining events.',
   keys: [
     ['Basic', R`\(P = \frac{\text{favorable}}{\text{total}}\), always between 0 and 1. \(P(\text{not } A) = 1 - P(A)\).`],

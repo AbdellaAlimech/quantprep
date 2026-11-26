@@ -23,8 +23,8 @@
   const KEY = 'qp_v1';
   let store = loadStore();
   function loadStore() {
-    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.att) return Object.assign({ att: {}, flags: {}, hist: [], days: {}, learn: {} }, s); } catch (e) { /* ignore */ }
-    return { att: {}, flags: {}, hist: [], days: {}, learn: {} };
+    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.att) return Object.assign({ att: {}, flags: {}, hist: [], days: {}, learn: {}, mocks: [] }, s); } catch (e) { /* ignore */ }
+    return { att: {}, flags: {}, hist: [], days: {}, learn: {}, mocks: [] };
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) { /* ignore */ } }
   const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -116,7 +116,7 @@
   let S = null, timerId = null;
   function startSession(o) {
     if (!o.ids.length) { toast('No questions match those filters.'); return; }
-    S = { exam: o.exam, mode: o.mode || 'practice', title: o.title, ids: o.ids, i: 0, resp: {}, checked: {}, flags: {}, start: Date.now(), limit: o.limit || null, done: false, elapsed: 0, lesson: o.lesson };
+    S = { exam: o.exam, mode: o.mode || 'practice', title: o.title, ids: o.ids, i: 0, resp: {}, checked: {}, flags: {}, start: Date.now(), limit: o.limit || null, done: false, elapsed: 0, lesson: o.lesson, mock: o.mock };
     location.hash = '#/quiz';
     if (location.hash === '#/quiz') route();
   }
@@ -131,7 +131,20 @@
       if (S.mode === 'test' && answered(p, r)) record(p, ok);
       if (S.mode === 'test') S.checked[id] = true;
     });
-    store.hist.unshift({ exam: S.exam, title: S.title, mode: S.mode, date: Date.now(), total: S.ids.length, correct, secs: Math.round(S.elapsed) });
+    if (S.mock && S.mock.stage === 1) {
+      M1 = { ids: S.ids, resp: S.resp, flags: S.flags, correct, elapsed: S.elapsed, used: S.mock.used, level: correct >= 8 ? 'hard' : correct <= 4 ? 'easy' : 'medium' };
+      save(); location.hash = '#/mockbreak'; return;
+    }
+    if (S.mock && S.mock.stage === 2 && M1) {
+      const c2 = correct, score = mockScore(M1.correct, c2, M1.level);
+      S.mockResult = { c1: M1.correct, c2, level: M1.level, score, n1: M1.ids.length, n2: S.ids.length };
+      S.ids = M1.ids.concat(S.ids); S.resp = Object.assign({}, M1.resp, S.resp);
+      S.ids.forEach((id) => { S.checked[id] = true; });
+      S.elapsed += M1.elapsed; correct += M1.correct; S.title = 'GRE Mock Test';
+      store.mocks = [{ date: Date.now(), score, c1: M1.correct, c2, level: M1.level }, ...(store.mocks || [])].slice(0, 30);
+      M1 = null;
+    }
+    store.hist.unshift({ exam: S.exam, title: S.mockResult ? `GRE Mock Test · est. ${S.mockResult.score}` : S.title, mode: S.mode, date: Date.now(), total: S.ids.length, correct, secs: Math.round(S.elapsed) });
     store.hist = store.hist.slice(0, 60); save();
     S.correct = correct;
     if (S.lesson != null) {
@@ -154,6 +167,7 @@
     if (a === 'stats') { setNav('stats'); return viewStats(); }
     if (a === 'learn' && LESSONS.length) { setNav('learn'); return b != null && LESSONS[+b - 1] ? viewLesson(+b - 1) : viewLearn(); }
     if (a === 'quiz' && S) { setNav(S.exam); return viewQuiz(); }
+    if (a === 'mockbreak') { setNav('gre'); return viewMockBreak(); }
     if (a === 'results' && S && S.done) { setNav(S.exam); return viewResults(); }
     setNav(''); viewHome();
   }
@@ -229,6 +243,7 @@
         <button class="card mode" data-act="missed" ${missed.length ? '' : 'disabled style="opacity:.55;cursor:not-allowed"'}><span class="ic">🔁</span><h3>Review mistakes</h3><p>${missed.length ? `Retry the ${missed.length} question${missed.length === 1 ? '' : 's'} you got wrong last time.` : 'Questions you miss will collect here.'}</p></button>
         <button class="card mode" data-act="flagged" ${flagged.length ? '' : 'disabled style="opacity:.55;cursor:not-allowed"'}><span class="ic">🚩</span><h3>Flagged questions</h3><p>${flagged.length ? `${flagged.length} question${flagged.length === 1 ? '' : 's'} you flagged for later.` : 'Flag questions during practice to save them here.'}</p></button>
       </div>
+      ${ex === 'gre' ? `<div class="section-title"><h2>Mock test</h2><span class="muted">Adaptive, like the real exam</span></div>${mockCard()}` : ''}
       <div class="section-title"><h2>Timed sections</h2><span class="muted">Exam conditions: no feedback until you finish</span></div>
       <div class="grid g3">
         ${e.sections.map((s, i) => `<button class="card mode" data-sec="${i}"><span class="ic">⏱️</span><h3>${s.label}</h3><p>${s.sub}</p></button>`).join('')}
@@ -242,6 +257,7 @@
     renderBuilder(ex, b, btn);
     app.onclick = (ev) => {
       const t = ev.target.closest('[data-act],[data-sec],[data-topic]'); if (!t || t.disabled) return;
+      if (t.dataset.act === 'mock') return startMock();
       if (t.dataset.act === 'quick') startSession({ exam: ex, title: 'Quick 10', ids: pickIds(bank, 10) });
       if (t.dataset.act === 'missed') startSession({ exam: ex, title: 'Review mistakes', ids: shuffle(missed).slice(0, 30).map((p) => p.id) });
       if (t.dataset.act === 'flagged') startSession({ exam: ex, title: 'Flagged questions', ids: flagged.map((p) => p.id) });
@@ -424,7 +440,31 @@
     const R = 64, C = 2 * Math.PI * R, col = sc >= 75 ? 'var(--ok)' : sc >= 50 ? 'var(--warn)' : 'var(--bad)';
     const msg = sc >= 90 ? 'Outstanding work!' : sc >= 75 ? 'Strong performance.' : sc >= 50 ? 'Good effort, keep building.' : 'Every mistake is a lesson; review the solutions below.';
     const missedIds = S.ids.filter((id) => !isCorrect(byId[id], S.resp[id]));
-    app.innerHTML = `
+    const mr = S.mockResult;
+    const head = mr ? `
+      <div class="card pad mock-result">
+        <div class="mock-big"><b>${mr.score}</b><span>Estimated GRE Quant score<br>(scale 130–170)</span></div>
+        <div style="flex:1;min-width:240px">
+          <span class="pill gre">GRE · Adaptive mock test</span>
+          <h1 style="font-size:28px;margin:10px 0 6px">${scoreBand(mr.score)}</h1>
+          <div class="row" style="margin:12px 0">
+            <span class="pill">Section 1: ${mr.c1}/${mr.n1}</span>
+            <span class="pill ${mr.level === 'hard' ? 'ok' : mr.level === 'easy' ? 'bad' : ''}">Section 2 (${LEVEL_NAME[mr.level]}): ${mr.c2}/${mr.n2}</span>
+            <span class="pill">Time ${fmtTime(S.elapsed)}</span>
+          </div>
+          <p class="tiny" style="margin:0 0 14px">${mr.level === 'hard' ? 'You reached the harder Section 2, which is needed for scores above about 160.' : mr.level === 'easy' ? 'Section 1 routed you to the easier Section 2, which caps the score near 160. Getting 8 or more right in Section 1 unlocks the harder section.' : 'You got the medium Section 2. Getting 8 or more right in Section 1 unlocks the harder section and a higher maximum score.'} This is an estimate: ETS doesn't publish its exact scoring, so this one is based on your accuracy and the difficulty of Section 2.</p>
+          <div class="row">
+            <a class="btn" href="#/quiz" id="reviewBtn">Review all 27 answers</a>
+            ${missedIds.length ? `<button class="btn ghost" id="retryBtn">Retry ${missedIds.length} missed</button>` : ''}
+            <a class="btn ghost" href="#/gre">Back to GRE dashboard</a>
+          </div>
+        </div>
+      </div>` : '';
+    app.innerHTML = mr ? head + `
+      <div class="section-title"><h2>By topic</h2></div>
+      <div class="card">${Object.entries(byTopic).map(([t, x]) => `<div class="topic-row"><div class="name">${t}<small>${x.c} of ${x.n} correct</small></div><div class="bar"><i style="width:${pct(x.c, x.n)}%"></i></div><div class="acc">${pct(x.c, x.n)}%</div><span></span></div>`).join('')}</div>
+      <div class="section-title"><h2>Questions</h2></div>
+      <div class="card">${S.ids.map((id, i) => { const p = byId[id], r = S.resp[id], ok = isCorrect(p, r), an = answered(p, r); return `${i === 0 ? '<div class="tiny" style="padding:10px 18px 0">Section 1</div>' : i === mr.n1 ? `<div class="tiny" style="padding:10px 18px 0;border-top:1px solid var(--line)">Section 2 · ${LEVEL_NAME[mr.level]}</div>` : ''}<div class="review-item" data-go="${i}"><span class="st ${ok ? 'ok' : an ? 'bad' : 'skip'}">${ok ? '✓' : an ? '✗' : '–'}</span><div><div class="pv">${i + 1}. ${esc(plain(p.type === 'qc' ? 'Compare: ' + p.qa + '  vs  ' + p.qb : p.q))}</div><span class="tiny">${esc(p.topic)} · ${esc(p.skill)} · ${DIFF_LABEL[p.diff]}</span></div><span class="tiny">View →</span></div>`; }).join('')}</div>` : `
       <div class="card pad" style="display:flex;gap:30px;align-items:center;flex-wrap:wrap">
         <div class="score-ring"><svg width="150" height="150"><circle cx="75" cy="75" r="${R}" fill="none" stroke="var(--bg2)" stroke-width="12"/><circle cx="75" cy="75" r="${R}" fill="none" stroke="${col}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - sc / 100)}"/></svg><div class="lbl"><div><b>${sc}%</b><span>${c} / ${total} correct</span></div></div></div>
         <div style="flex:1;min-width:240px">
@@ -449,6 +489,76 @@
       if (ev.target.id === 'reviewBtn') S.i = 0;
       if (ev.target.id === 'retryBtn') startSession({ exam: S.exam, title: 'Retry missed', ids: missedIds });
     };
+  }
+
+  // ----- mock test -----
+  const MOCK_MIX = { s1: [0.25, 0.5, 0.25], easy: [0.45, 0.5, 0.05], medium: [0.2, 0.55, 0.25], hard: [0, 0.35, 0.65] };
+  const MOCK_TYPES = {
+    12: ['qc', 'qc', 'qc', 'qc', 'mc', 'mc', 'mc', 'mc', 'mc', 'multi', 'num', 'num'],
+    15: ['qc', 'qc', 'qc', 'qc', 'qc', 'mc', 'mc', 'mc', 'mc', 'mc', 'mc', 'multi', 'multi', 'num', 'num'],
+  };
+  const LEVEL_W = { easy: 0.75, medium: 1, hard: 1.25 };
+  const LEVEL_NAME = { easy: 'Easier', medium: 'Medium', hard: 'Harder' };
+  let M1 = null;
+  function pickDiff(w) { const r = Math.random(); return r < w[0] ? 1 : r < w[0] + w[1] ? 2 : 3; }
+  function mockIds(n, weights, used) {
+    const topics = shuffle(EXAMS.gre.topics), out = [];
+    MOCK_TYPES[n].forEach((ty, k) => {
+      const want = pickDiff(weights), topic = topics[k % topics.length];
+      const pool = BANKS.gre.filter((p) => p.type === ty && !used.has(p.id));
+      const tiers = [(p) => p.topic === topic && p.diff === want && !store.att[p.id], (p) => p.diff === want && !store.att[p.id], (p) => p.diff === want, () => true];
+      for (const f of tiers) { const c = pool.filter(f); if (c.length) { const p = c[Math.floor(Math.random() * c.length)]; used.add(p.id); out.push(p); break; } }
+    });
+    const order = { qc: 0, mc: 1, multi: 1, num: 1 };
+    return out.sort((a, b) => order[a.type] - order[b.type] || a.diff - b.diff).map((p) => p.id);
+  }
+  function mockScore(c1, c2, level) {
+    const pts = c1 + LEVEL_W[level] * c2, max = 12 + 15 * LEVEL_W.hard;
+    return Math.max(130, Math.min(170, Math.round(130 + (40 * pts) / max)));
+  }
+  function scoreBand(s) {
+    if (s >= 165) return 'Top tier: competitive even for the most selective programs.';
+    if (s >= 160) return 'Strong: competitive for most engineering and science master\'s programs.';
+    if (s >= 155) return 'Solid, but below what many engineering programs look for. Push the hard topics.';
+    if (s >= 150) return 'Developing: follow the 30-day plan and retake a mock in a week.';
+    return 'Early stage: start with the Learn section, one topic a day.';
+  }
+  function startMock() {
+    const used = new Set();
+    M1 = null;
+    startSession({ exam: 'gre', mode: 'test', title: 'GRE Mock · Section 1 of 2', ids: mockIds(12, MOCK_MIX.s1, used), limit: 21 * 60, mock: { stage: 1, used } });
+  }
+  function startMock2() {
+    if (!M1) return startMock();
+    startSession({ exam: 'gre', mode: 'test', title: 'GRE Mock · Section 2 of 2', ids: mockIds(15, MOCK_MIX[M1.level], M1.used), limit: 26 * 60, mock: { stage: 2 } });
+  }
+  function viewMockBreak() {
+    if (!M1) { location.hash = '#/gre'; return; }
+    app.innerHTML = `
+      <div class="card pad mock-break">
+        <div class="big-ic">✅</div>
+        <h1>Section 1 complete</h1>
+        <p class="muted">Section 2 has <b>15 questions</b> and <b>26 minutes</b>. As on the real GRE, its difficulty depends on how you did in Section 1. You'll see your score at the end.</p>
+        <div class="row" style="justify-content:center;margin-top:8px"><button class="btn" id="go2">Start Section 2 →</button></div>
+        <p class="tiny" style="margin-top:18px">Take a short breath, but don't wait too long; on test day there is no break between the quant sections.</p>
+      </div>`;
+    $('#go2').onclick = startMock2;
+  }
+  function mockCard() {
+    const ms = store.mocks || [], last = ms[0], best = ms.length ? Math.max(...ms.map((m) => m.score)) : null;
+    return `<div class="card mock-card">
+      <div class="mock-l">
+        <span class="pill gre">Recommended weekly</span>
+        <h3>🎓 Full GRE Quant mock test</h3>
+        <p class="muted">Two sections that adapt like the real GRE: 12 questions in 21 min, then 15 questions in 26 min. Section 2 gets harder or easier based on Section 1. You get an estimated score from 130 to 170.</p>
+        <button class="btn" data-act="mock">Start mock test</button>
+      </div>
+      <div class="mock-r">
+        ${last ? `<div class="mock-score"><b>${last.score}</b><span>last estimate</span></div><div class="tiny">Best ${best} · ${ms.length} test${ms.length === 1 ? '' : 's'} taken</div>
+          <div class="mock-hist">${ms.slice(0, 6).reverse().map((m) => `<i style="height:${Math.max(6, ((m.score - 130) / 40) * 56)}px" title="${m.score} on ${new Date(m.date).toLocaleDateString()}"></i>`).join('')}</div>`
+          : '<div class="mock-score"><b>—</b><span>no mock yet</span></div><div class="tiny">Take one now to get your starting score.</div>'}
+      </div>
+    </div>`;
   }
 
   // ----- learn -----
@@ -597,7 +707,7 @@
       <div class="grid g2" style="margin-top:18px">${['gre', 'sat'].map((ex) => { const st = examStats(ex); return `<div class="card ${ex === 'sat' ? 'sat-theme' : ''}"><div class="pad" style="padding-bottom:8px"><div class="row"><span class="pill ${ex}">${EXAMS[ex].short}</span><b>${EXAMS[ex].name}</b><span class="spacer"></span><span class="tiny">${st.seen}/${st.total} attempted · ${st.attempts ? st.acc + '% accuracy' : 'no attempts yet'}</span></div></div>${EXAMS[ex].topics.map((t) => { const x = st.topics[t]; return `<div class="topic-row" style="grid-template-columns:1fr 90px 50px"><div class="name">${t}<small>${x.seen}/${x.total} attempted</small></div><div class="bar"><i style="width:${pct(x.c, x.n)}%"></i></div><div class="acc">${x.n ? pct(x.c, x.n) + '%' : '—'}</div></div>`; }).join('')}</div>`; }).join('')}</div>
       <div class="section-title"><h2>Recent sessions</h2></div>
       <div class="card">${store.hist.length ? store.hist.slice(0, 25).map((h) => `<div class="review-item" style="cursor:default"><span class="st ${pct(h.correct, h.total) >= 70 ? 'ok' : 'bad'}">${pct(h.correct, h.total)}</span><div><div class="pv" style="color:var(--ink)"><span class="pill ${h.exam}">${EXAMS[h.exam].short}</span> ${esc(h.title)} · ${h.mode === 'test' ? 'Timed' : 'Practice'}</div><span class="tiny">${new Date(h.date).toLocaleString()} · ${h.correct}/${h.total} correct · ${fmtTime(h.secs)}</span></div><span></span></div>`).join('') : '<div class="empty"><div class="big">📊</div><p>Finish a practice set and your sessions will appear here.</p></div>'}</div>`;
-    $('#resetBtn').onclick = () => { if (confirm('Erase all saved progress, flags and history in this browser? This cannot be undone.')) { store = { att: {}, flags: {}, hist: [], days: {}, learn: {} }; save(); toast('Progress reset'); viewStats(); } };
+    $('#resetBtn').onclick = () => { if (confirm('Erase all saved progress, flags and history in this browser? This cannot be undone.')) { store = { att: {}, flags: {}, hist: [], days: {}, learn: {}, mocks: [] }; save(); toast('Progress reset'); viewStats(); } };
   }
 
   // ---------- theme ----------
