@@ -1,12 +1,17 @@
 # QuantPrep: GRE Quant & SAT Math practice
 
-A free, static practice site with **1,721 GRE Quantitative** and **1,256 SAT Math** problems. Every problem has a step-by-step explanation.
+A free, static practice site with **1,913 GRE Quantitative** and **1,256 SAT Math** problems. Every problem has a step-by-step explanation.
 
 **Live site:** https://abdellaalimech.github.io/quantprep/
 
 ## Features
 - **Adaptive GRE mock test:** two sections (12 Q / 21 min, then 15 Q / 26 min); Section 2 gets harder or easier depending on Section 1, like the real exam; ends with an estimated 130–170 score and score history
-- **563 hard GRE questions** (multi-step word problems, tricky Quantitative Comparisons, combined geometry)
+- **Charts and figures:** 192 GRE questions with drawn bar charts, line graphs, pie charts and geometry figures (triangles, parallel lines, circles, shaded regions)
+- **GRE-style calculator** in every GRE session, with memory, square root and Transfer Display
+- **Spaced review:** missed questions come back after 1, 3 and 7 days; add a personal note to any question
+- **Printable formula sheet** covering all 30 lessons
+- **Backup and restore:** download your progress as a file and import it on another device
+- **612 hard GRE questions** (multi-step word problems, tricky Quantitative Comparisons, combined geometry)
 - **30-day GRE study plan (Learn):** one topic per day, with key ideas, a worked example, common traps and a set of 12 exercises; progress is tracked per day
 - **GRE question formats:** Quantitative Comparison, multiple choice (5 options), select-all-that-apply, numeric entry
 - **SAT question formats:** multiple choice (4 options) and student-produced responses (grid-ins)

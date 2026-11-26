@@ -254,7 +254,7 @@ window.GRE_LESSONS = [
   tip: 'Spend at most about 1.5 minutes per QC question. If you can\'t prove A, B or C quickly, look for a counterexample.',
 },
 {
-  title: 'Lines, angles & triangles', area: 'Geometry', tpl: ['triangleAngles', 'qcTriangle', 'msTriangle'],
+  title: 'Lines, angles & triangles', area: 'Geometry', tpl: ['triangleAngles', 'qcTriangle', 'msTriangle', 'hTriFig', 'hParallelFig'],
   intro: 'Triangles are the building blocks of GRE geometry. Remember that figures are not necessarily drawn to scale.',
   keys: [
     ['Angles', R`Angles on a straight line sum to 180°. Vertical angles are equal. A parallel line crossed by a transversal makes equal corresponding and alternate angles.`],
@@ -268,7 +268,7 @@ window.GRE_LESSONS = [
   tip: 'Redraw the figure and label every angle and length you know.',
 },
 {
-  title: 'Right triangles & special triangles', area: 'Geometry', tpl: ['pythag', 'specialTri'],
+  title: 'Right triangles & special triangles', area: 'Geometry', tpl: ['pythag', 'specialTri', 'hRightFig'],
   intro: 'Right triangles appear everywhere, including inside rectangles, circles and coordinate problems.',
   keys: [
     ['Pythagorean theorem', R`\(a^2 + b^2 = c^2\), where \(c\) is the hypotenuse.`],
@@ -282,7 +282,7 @@ window.GRE_LESSONS = [
   tip: 'Spot the triples instantly; they save calculation time.',
 },
 {
-  title: 'Polygons, quadrilaterals & similar figures', area: 'Geometry', tpl: ['polygonAngles', 'rectangle', 'similar'],
+  title: 'Polygons, quadrilaterals & similar figures', area: 'Geometry', tpl: ['polygonAngles', 'rectangle', 'similar', 'hShadedFig'],
   intro: 'Many-sided shapes reduce to triangles and rectangles.',
   keys: [
     ['Interior angles', R`The sum for an \(n\)-gon is \(180(n - 2)\). Each angle of a regular \(n\)-gon is \(\frac{180(n - 2)}{n}\). The exterior angles always sum to 360°.`],
@@ -294,7 +294,7 @@ window.GRE_LESSONS = [
   tip: 'Find each exterior angle with 360 ÷ n, then the interior angle is 180 minus that.',
 },
 {
-  title: 'Circles', area: 'Geometry', tpl: ['circleAC', 'arcSector', 'qcCircle', 'hInscribed'],
+  title: 'Circles', area: 'Geometry', tpl: ['circleAC', 'arcSector', 'qcCircle', 'hInscribed', 'hCircleFig'],
   intro: 'Circle questions use just a few formulas. Usually you find the radius first.',
   keys: [
     ['Basics', R`Circumference \(C = 2\pi r = \pi d\). Area \(A = \pi r^2\).`],
@@ -359,7 +359,7 @@ window.GRE_LESSONS = [
   tip: 'Sketch the bell curve and write 34, 13.5, 2.5 on each side of the mean.',
 },
 {
-  title: 'Quartiles, IQR & data interpretation', area: 'Data Analysis', tpl: ['iqr', 'tableData'],
+  title: 'Quartiles, IQR & data interpretation', area: 'Data Analysis', tpl: ['iqr', 'tableData', 'hBarQ', 'hLineQ', 'hPieQ'],
   intro: 'Reading tables carefully is half the battle in data questions.',
   keys: [
     ['Quartiles', R`Sort the data. Q2 is the median. Q1 is the median of the lower half, and Q3 is the median of the upper half.`],

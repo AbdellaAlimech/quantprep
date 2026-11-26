@@ -322,3 +322,74 @@ table.dt th { background: var(--bg2); font-weight: 600; }
 @media (max-width: 640px) { .mock-r { width: 100%; } .mock-big { width: 140px; height: 140px; } .mock-big b { font-size: 46px; } }
 .review-item .pv { position: relative; }
 main.wrap { overflow-x: clip; }
+
+/* spaced review notes */
+.note-box { margin-top: 14px; }
+.note-box label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+.note-box textarea { width: 100%; font: inherit; font-size: 15px; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; resize: vertical; }
+.note-peek { margin-top: 16px; padding: 10px 14px; border-radius: 12px; background: var(--brand-soft); font-size: 14.5px; }
+.note-peek summary { cursor: pointer; font-weight: 600; }
+.note-peek p { margin: 8px 0 0; }
+/* backup */
+.backup { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+.backup h3 { font-size: 18px; }
+/* calculator */
+.calc { position: fixed; right: 24px; bottom: 24px; width: 260px; z-index: 40; background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-lg); padding: 0 12px 12px; outline: none; user-select: none; }
+.calc:focus-visible { box-shadow: 0 0 0 3px var(--brand-soft), var(--shadow-lg); }
+.calc-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 2px; cursor: move; font-weight: 600; font-size: 14px; color: var(--ink2); touch-action: none; }
+.calc-x { border: 0; background: none; cursor: pointer; color: var(--ink3); font-size: 16px; }
+.calc-disp { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-family: ui-monospace, Consolas, monospace; font-size: 20px; text-align: right; margin-bottom: 10px; min-height: 48px; }
+.calc-disp #calcDisp { overflow-x: auto; white-space: nowrap; flex: 1; }
+.calc-mem { font-size: 12px; color: var(--brand); font-weight: 700; }
+.calc-keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.calc-keys button { padding: 10px 0; border-radius: 9px; border: 1px solid var(--line); background: var(--bg2); cursor: pointer; font-size: 15px; font-weight: 600; color: var(--ink); }
+.calc-keys button.n { background: var(--card); }
+.calc-keys button.c { color: var(--bad); }
+.calc-keys button:hover { border-color: var(--brand); }
+.calc-keys .eq { grid-column: span 4; background: var(--brand); color: #fff; border-color: var(--brand); }
+.calc-xfer { width: 100%; margin-top: 8px; padding: 9px; border-radius: 9px; border: 1px dashed var(--ink3); background: none; cursor: pointer; font-weight: 600; font-size: 13.5px; color: var(--ink2); }
+/* formula sheet */
+.sheet { padding: 26px 30px; columns: 2 340px; column-gap: 34px; }
+.sheet-sec { break-inside: avoid; margin-bottom: 18px; }
+.sheet-sec h3 { font-size: 15.5px; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.sheet-sec h3 span { width: 22px; height: 22px; border-radius: 6px; background: var(--brand-soft); color: var(--brand); display: inline-grid; place-items: center; font-size: 12px; flex: none; }
+.sheet-sec ul { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.55; }
+.sheet-sec li { margin-bottom: 3px; }
+.sheet-trap { margin: 4px 0 0; font-size: 13px; color: var(--bad); }
+.print-only { display: none; }
+@media print {
+  @page { margin: 12mm; }
+  :root { --bg: #fff; --card: #fff; --ink: #000; --ink2: #222; --line: #ccc; --brand-soft: #eee; --brand: #333; --bad: #900; }
+  body { background: #fff; }
+  .topbar, .foot, .no-print, .toast, .calc { display: none !important; }
+  main.wrap { padding: 0; max-width: none; }
+  .sheet { border: 0; box-shadow: none; padding: 0; columns: 2; column-gap: 8mm; font-size: 9.5pt; }
+  .sheet-sec ul { font-size: 9pt; line-height: 1.35; }
+  .sheet-sec h3 { font-size: 10.5pt; }
+  .sheet-trap { font-size: 8.5pt; }
+  .print-only { display: block; column-span: all; margin-bottom: 4mm; font-size: 12pt; }
+}
+
+/* figures */
+.fig { display: block; width: 100%; height: auto; margin: 14px auto 6px; color: var(--ink); font-family: Inter, system-ui, sans-serif; }
+.fig text { fill: currentColor; font-size: 13px; }
+.fig .ttl { font-weight: 700; font-size: 14px; }
+.fig .ax { fill: var(--ink2); font-size: 12px; }
+.fig .val { font-weight: 700; font-size: 12px; }
+.fig .grid { stroke: var(--line); stroke-width: 1; }
+.fig .axis { stroke: var(--ink2); stroke-width: 1.5; }
+.fig .cbar { fill: var(--brand); opacity: .85; }
+.fig .pl { fill: none; stroke: var(--brand); stroke-width: 2.5; stroke-linejoin: round; }
+.fig .pt { fill: var(--card); stroke: var(--brand); stroke-width: 2.5; }
+.fig .slice { stroke: var(--card); stroke-width: 2; }
+.fig .pie-l { fill: #fff; font-weight: 700; font-size: 12.5px; }
+.fig .leg { font-size: 13.5px; }
+.fig .shape { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+.fig .shade { fill: var(--brand); opacity: .22; }
+.fig .ln, .fig .ln2 { stroke: currentColor; stroke-width: 2; }
+.fig .dash { stroke: currentColor; stroke-width: 1.6; stroke-dasharray: 6 5; }
+.fig .ra { fill: none; stroke: currentColor; stroke-width: 1.5; }
+.fig .dot { fill: currentColor; }
+.fig .lbl { font-size: 15px; font-weight: 600; fill: var(--brand); }
+.fig .pt-l { font-size: 15px; font-style: italic; font-family: 'Times New Roman', serif; }
+.fig-note { font-size: 12.5px; color: var(--ink3); text-align: center; margin: 0 0 12px; font-style: italic; }

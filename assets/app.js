@@ -23,15 +23,20 @@
   const KEY = 'qp_v1';
   let store = loadStore();
   function loadStore() {
-    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.att) return Object.assign({ att: {}, flags: {}, hist: [], days: {}, learn: {}, mocks: [] }, s); } catch (e) { /* ignore */ }
-    return { att: {}, flags: {}, hist: [], days: {}, learn: {}, mocks: [] };
+    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.att) return migrate(Object.assign({ att: {}, flags: {}, hist: [], days: {}, learn: {}, mocks: [], srs: {}, notes: {} }, s)); } catch (e) { /* ignore */ }
+    return { att: {}, flags: {}, hist: [], days: {}, learn: {}, mocks: [], srs: {}, notes: {} };
+  }
+  function migrate(st) {
+    // questions missed before spaced review existed are due now
+    if (!st.srsInit) { for (const [id, a] of Object.entries(st.att)) if (!a.last && !st.srs[id]) st.srs[id] = { box: 0, due: Date.now() }; st.srsInit = 1; }
+    return st;
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) { /* ignore */ } }
   const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
   function record(p, ok) {
     const a = store.att[p.id] || { n: 0, c: 0 };
     a.n++; if (ok) a.c++; a.last = ok ? 1 : 0; a.t = Date.now();
-    store.att[p.id] = a; store.days[today()] = (store.days[today()] || 0) + 1; save();
+    store.att[p.id] = a; store.days[today()] = (store.days[today()] || 0) + 1; srsUpdate(p, ok); save();
   }
 
   // ---------- helpers ----------
@@ -45,7 +50,7 @@
   function math(el) { if (window.renderMathInElement) window.renderMathInElement(el, { delimiters: [{ left: '\\(', right: '\\)', display: false }], throwOnError: false }); }
   let toastT;
   function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200); }
-  const plain = (html) => html.replace(/<table[\s\S]*?<\/table>/g, ' [table] ').replace(/<br>/g, ' ').replace(/<[^>]+>/g, '');
+  const plain = (html) => html.replace(/<svg[\s\S]*?<\/svg>/g, ' [figure] ').replace(/<div class="fig-note">[\s\S]*?<\/div>/g, ' ').replace(/<table[\s\S]*?<\/table>/g, ' [table] ').replace(/<br>/g, ' ').replace(/<[^>]+>/g, '');
   const letters = (p) => (p.type === 'qc' ? 'ABCD' : 'ABCDEFGH');
   function diffDots(d) { return `<span class="diff" title="${DIFF_LABEL[d]}">${[1, 2, 3].map((i) => `<i class="${i <= d ? 'on' : ''}"></i>`).join('')}</span>`; }
 
@@ -158,6 +163,7 @@
   function setNav(k) { $$('#nav a').forEach((a) => a.classList.toggle('on', a.dataset.nav === k)); }
   function route() {
     clearInterval(timerId);
+    if (!location.hash.startsWith('#/quiz')) toggleCalc(false);
     const h = location.hash.replace(/^#\/?/, '');
     const [a, b] = h.split('/');
     document.body.classList.toggle('sat-theme', a !== 'learn' && (a === 'sat' || (b === 'sat') || (S && S.exam === 'sat' && (a === 'quiz' || a === 'results'))));
@@ -165,6 +171,7 @@
     if (a === 'gre' || a === 'sat') { setNav(a); return viewExam(a); }
     if (a === 'bank' && EXAMS[b]) { setNav(b); return viewBank(b); }
     if (a === 'stats') { setNav('stats'); return viewStats(); }
+    if (a === 'formulas' && LESSONS.length) { setNav('learn'); return viewFormulas(); }
     if (a === 'learn' && LESSONS.length) { setNav('learn'); return b != null && LESSONS[+b - 1] ? viewLesson(+b - 1) : viewLearn(); }
     if (a === 'quiz' && S) { setNav(S.exam); return viewQuiz(); }
     if (a === 'mockbreak') { setNav('gre'); return viewMockBreak(); }
@@ -220,6 +227,7 @@
   function viewExam(ex) {
     const e = EXAMS[ex], st = examStats(ex), bank = BANKS[ex];
     const missed = bank.filter((p) => store.att[p.id] && !store.att[p.id].last);
+    const sr = srsInfo(ex);
     const flagged = bank.filter((p) => store.flags[p.id]);
     const b = builder[ex] || (builder[ex] = { topics: new Set(e.topics), diffs: new Set([1, 2, 3]), types: new Set(typesOf(ex)), n: 10, mode: 'practice', filter: 'all' });
     const btn = ex === 'sat' ? 'btn sat' : 'btn';
@@ -233,14 +241,14 @@
       <div class="grid g4">
         <div class="card stat"><b>${st.seen}</b><span>questions attempted</span></div>
         <div class="card stat"><b>${st.attempts ? st.acc + '%' : '—'}</b><span>overall accuracy</span></div>
-        <div class="card stat"><b>${missed.length}</b><span>to review (last try wrong)</span></div>
+        <div class="card stat"><b>${sr.due.length}</b><span>due for spaced review</span></div>
         <div class="card stat"><b>${streak()}</b><span>day streak</span></div>
       </div>
       ${ex === 'gre' && LESSONS.length ? learnBanner() : ''}
       <div class="section-title"><h2>Practice modes</h2></div>
       <div class="grid g3">
         <button class="card mode" data-act="quick"><span class="ic">⚡</span><h3>Quick 10</h3><p>Ten mixed questions you haven't seen yet, with instant feedback.</p></button>
-        <button class="card mode" data-act="missed" ${missed.length ? '' : 'disabled style="opacity:.55;cursor:not-allowed"'}><span class="ic">🔁</span><h3>Review mistakes</h3><p>${missed.length ? `Retry the ${missed.length} question${missed.length === 1 ? '' : 's'} you got wrong last time.` : 'Questions you miss will collect here.'}</p></button>
+        <button class="card mode" data-act="srs" ${sr.due.length ? '' : 'disabled style="opacity:.55;cursor:not-allowed"'}><span class="ic">🔁</span><h3>Spaced review${sr.due.length ? ` · ${sr.due.length} due` : ''}</h3><p>${sr.due.length ? `Questions you missed come back after 1, 3 and 7 days until you get them right. ${sr.due.length} due today.` : sr.items.length ? `${sr.items.length} question${sr.items.length === 1 ? '' : 's'} scheduled. Next review ${relDay(sr.next)}.` : 'Questions you miss come back after 1, 3 and 7 days until you master them.'}</p></button>
         <button class="card mode" data-act="flagged" ${flagged.length ? '' : 'disabled style="opacity:.55;cursor:not-allowed"'}><span class="ic">🚩</span><h3>Flagged questions</h3><p>${flagged.length ? `${flagged.length} question${flagged.length === 1 ? '' : 's'} you flagged for later.` : 'Flag questions during practice to save them here.'}</p></button>
       </div>
       ${ex === 'gre' ? `<div class="section-title"><h2>Mock test</h2><span class="muted">Adaptive, like the real exam</span></div>${mockCard()}` : ''}
@@ -259,7 +267,7 @@
       const t = ev.target.closest('[data-act],[data-sec],[data-topic]'); if (!t || t.disabled) return;
       if (t.dataset.act === 'mock') return startMock();
       if (t.dataset.act === 'quick') startSession({ exam: ex, title: 'Quick 10', ids: pickIds(bank, 10) });
-      if (t.dataset.act === 'missed') startSession({ exam: ex, title: 'Review mistakes', ids: shuffle(missed).slice(0, 30).map((p) => p.id) });
+      if (t.dataset.act === 'srs') startSession({ exam: ex, title: 'Spaced review', ids: shuffle(sr.due).slice(0, 30).map((p) => p.id) });
       if (t.dataset.act === 'flagged') startSession({ exam: ex, title: 'Flagged questions', ids: flagged.map((p) => p.id) });
       if (t.dataset.sec != null) { const s = e.sections[+t.dataset.sec]; startSession({ exam: ex, mode: 'test', title: `${e.short} ${s.label}`, ids: sectionIds(ex, s.n), limit: s.min * 60 }); }
       if (t.dataset.topic) startSession({ exam: ex, title: `${t.dataset.topic} drill`, ids: pickIds(bank.filter((p) => p.topic === t.dataset.topic), 10) });
@@ -323,7 +331,7 @@
         return `<button class="choice ${p.type === 'multi' ? 'multi' : ''} ${cls}" data-i="${i}" ${checked ? 'disabled' : ''}><span class="let">${L[i]}</span><span>${big(c)}</span></button>`;
       }).join('')}</div>`;
     }
-    const fb = checked ? `<div class="feedback ${ok ? 'ok' : 'bad'}"><h4>${ok ? '✓ Correct' : answered(p, r) ? '✗ Not quite' : '— Not answered'}</h4>${ok ? '' : `<div style="margin-bottom:8px"><b>Correct answer:</b> ${answerText(p)}</div>`}<div class="expl">${p.expl}</div></div>` : '';
+    const fb = checked ? `<div class="feedback ${ok ? 'ok' : 'bad'}"><h4>${ok ? '✓ Correct' : answered(p, r) ? '✗ Not quite' : '— Not answered'}</h4>${ok ? '' : `<div style="margin-bottom:8px"><b>Correct answer:</b> ${answerText(p)}</div>`}<div class="expl">${p.expl}</div></div>${noteBox(id)}` : '';
     const last = S.i === S.ids.length - 1;
     let actions;
     if (S.done) actions = `<button class="btn ghost" data-nav="-1" ${S.i ? '' : 'disabled'}>← Previous</button><button class="${btn}" data-nav="1" ${last ? 'disabled' : ''}>Next →</button><span class="spacer"></span><a class="btn ghost" href="#/results">Back to results</a>`;
@@ -336,6 +344,7 @@
         <a class="btn ghost sm" href="#/${S.exam}" id="exitBtn">✕ Exit</a>
         <div><b>${esc(S.title)}</b><div class="tiny">${S.done ? 'Review' : test ? 'Timed test' : 'Practice'} · Question ${S.i + 1} of ${S.ids.length}</div></div>
         <div class="prog"><div class="bar"><i style="width:${pct(S.done ? S.ids.length : test ? nAns : Object.keys(S.checked).length, S.ids.length)}%"></i></div></div>
+        ${S.exam === 'gre' ? `<button class="btn ghost sm" id="calcBtn" title="GRE-style calculator">🧮 Calculator</button>` : ''}
         ${timerHtml}
       </div>
       <div class="quiz">
@@ -343,6 +352,7 @@
           <div class="qmeta"><span class="pill ${S.exam}">${EXAMS[S.exam].short}</span><span class="pill">${esc(p.topic)}</span>${p.skill !== TYPE_LABEL[p.type] ? `<span class="pill">${esc(p.skill)}</span>` : ''}<span class="pill">${TYPE_LABEL[p.type]}</span>${diffDots(p.diff)}<span class="spacer"></span><span class="tiny">#${p.id}</span></div>
           <div class="qtext">${p.type === 'qc' ? (p.q ? `<div style="text-align:center">${p.q}</div>` : '') + qcBlock + '<div class="tiny" style="margin-top:6px">Compare Quantity A and Quantity B.</div>' : p.q}${p.type === 'multi' ? '' : ''}</div>
           ${answerUI}
+          ${!checked && store.notes && store.notes[id] ? `<details class="note-peek"><summary>📝 You left a note on this question</summary><p>${esc(store.notes[id])}</p></details>` : ''}
           ${fb}
           <div class="qactions">${actions}</div>
         </div>
@@ -364,6 +374,9 @@
         </aside>
       </div>`;
     math(app);
+    const cb = $('#calcBtn'); if (cb) cb.onclick = () => toggleCalc();
+    const nt = $('#noteIn');
+    if (nt) { let d; nt.oninput = () => { clearTimeout(d); d = setTimeout(() => { store.notes = store.notes || {}; const v = nt.value.trim(); if (v) store.notes[id] = v.slice(0, 500); else delete store.notes[id]; save(); }, 300); }; }
     const inp = $('#numIn');
     if (inp && !checked) {
       inp.oninput = () => { S.resp[id] = inp.value; const b = $('[data-act="check"]'); if (b) b.disabled = !answered(p, inp.value); refreshNavCell(); };
@@ -413,6 +426,7 @@
   }
   document.addEventListener('keydown', (e) => {
     if (!S || !location.hash.startsWith('#/quiz') || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.target.tagName === 'TEXTAREA' || e.target.closest('#calc')) return;
     const p = byId[S.ids[S.i]], inInput = e.target.tagName === 'INPUT';
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -489,6 +503,151 @@
       if (ev.target.id === 'reviewBtn') S.i = 0;
       if (ev.target.id === 'retryBtn') startSession({ exam: S.exam, title: 'Retry missed', ids: missedIds });
     };
+  }
+
+  // ----- spaced review -----
+  const DAY = 86400000, SRS_DAYS = [1, 3, 7];
+  const endOfToday = () => { const d = new Date(); d.setHours(23, 59, 59, 999); return d.getTime(); };
+  function srsUpdate(p, ok) {
+    store.srs = store.srs || {};
+    const s = store.srs[p.id], now = Date.now();
+    if (!ok) { store.srs[p.id] = { box: 0, due: now + DAY }; return; }
+    if (!s || now < s.due - DAY / 2) return; // practicing early doesn't advance the schedule
+    const box = s.box + 1;
+    if (box >= SRS_DAYS.length) { delete store.srs[p.id]; store.mastered = (store.mastered || 0) + 1; }
+    else store.srs[p.id] = { box, due: now + SRS_DAYS[box] * DAY };
+  }
+  function srsInfo(ex) {
+    const items = BANKS[ex].filter((p) => store.srs && store.srs[p.id]);
+    const due = items.filter((p) => store.srs[p.id].due <= endOfToday());
+    const next = items.filter((p) => store.srs[p.id].due > endOfToday()).map((p) => store.srs[p.id].due).sort((a, b) => a - b)[0];
+    return { items, due, next };
+  }
+  const relDay = (t) => { const d = Math.round((new Date(t).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / DAY); return d <= 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d} days`; };
+  function noteBox(id) {
+    return `<div class="note-box"><label for="noteIn">📝 My note <span class="tiny">(saved automatically; you'll see it when this question comes back)</span></label>
+      <textarea id="noteIn" rows="2" placeholder="e.g. I forgot to flip the inequality when dividing by a negative">${esc((store.notes || {})[id] || '')}</textarea></div>`;
+  }
+
+  // ----- formula sheet -----
+  function viewFormulas() {
+    app.innerHTML = `
+      <div class="dash-head no-print">
+        <div><h1>GRE Quant formula sheet</h1><div class="muted">Every key idea and formula from the 30 lessons, plus the top trap for each. Print it or save it as a PDF to review before test day.</div></div>
+        <span class="spacer"></span><a class="btn ghost" href="#/learn">← Study plan</a><button class="btn" id="printBtn">🖨️ Print / save as PDF</button>
+      </div>
+      <div class="card sheet">
+        <div class="sheet-title print-only"><b>GRE Quant formula sheet</b> · QuantPrep</div>
+        ${LESSONS.map((l, i) => `<section class="sheet-sec"><h3><span>${i + 1}</span>${esc(l.title)}</h3><ul>${l.keys.map(([h, b]) => `<li><b>${h}.</b> ${b}</li>`).join('')}</ul><p class="sheet-trap">⚠ ${l.traps[0]}</p></section>`).join('')}
+      </div>`;
+    math(app);
+    $('#printBtn').onclick = () => window.print();
+  }
+
+  // ----- backup -----
+  function exportBackup() {
+    const data = JSON.stringify({ app: 'quantprep', version: 1, exported: new Date().toISOString(), store }, null, 1);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+    a.download = `quantprep-backup-${today()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    store.lastBackup = Date.now(); save(); toast('Backup downloaded');
+  }
+  function importBackup(file) {
+    const rd = new FileReader();
+    rd.onload = () => {
+      let obj; try { obj = JSON.parse(rd.result); } catch (e) { return toast('That file is not a valid backup.'); }
+      if (!obj || obj.app !== 'quantprep' || !obj.store || typeof obj.store.att !== 'object') return toast('That file is not a QuantPrep backup.');
+      const n = Object.keys(obj.store.att).length;
+      if (!confirm(`Replace the progress in this browser with the backup from ${new Date(obj.exported).toLocaleString()} (${n} questions attempted)?`)) return;
+      store = Object.assign({ att: {}, flags: {}, hist: [], days: {}, learn: {}, mocks: [], srs: {}, notes: {} }, obj.store);
+      if (!store.lastBackup && obj.exported) store.lastBackup = Date.parse(obj.exported);
+      save(); toast('Progress restored'); route();
+    };
+    rd.readAsText(file);
+  }
+
+  // ----- calculator (GRE style) -----
+  const calc = { expr: '', mem: 0, open: false, err: false, justEval: false };
+  function calcEval(src) {
+    let i = 0; const s = src.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-');
+    const peek = () => s[i], eat = (c) => { if (s[i] === c) { i++; return true; } return false; };
+    function num() { const m = s.slice(i).match(/^\d*\.?\d+(e-?\d+)?/); if (!m) throw 0; i += m[0].length; return parseFloat(m[0]); }
+    function factor() { if (eat('-')) return -factor(); if (eat('(')) { const v = expr(); if (!eat(')')) throw 0; return v; } return num(); }
+    function term() { let v = factor(); for (;;) { if (eat('*')) v *= factor(); else if (eat('/')) { const d = factor(); if (d === 0) throw 0; v /= d; } else return v; } }
+    function expr() { let v = term(); for (;;) { if (eat('+')) v += term(); else if (eat('-')) v -= term(); else return v; } }
+    const v = expr(); if (i !== s.length || !isFinite(v)) throw 0; return v;
+  }
+  // the GRE calculator shows at most 8 digits
+  const calcFmt = (v) => (Math.abs(v) >= 1e8 ? 'Error' : String(parseFloat(v.toPrecision(8))));
+  function calcDisplay() {
+    const d = $('#calcDisp'); if (!d) return;
+    d.textContent = calc.err ? 'Error' : calc.expr || '0';
+    $('#calcMem').textContent = calc.mem ? 'M' : '';
+  }
+  function trailingNum() { const m = calc.expr.match(/-?\d*\.?\d+$/); return m ? m[0] : null; }
+  function calcPress(k) {
+    if (calc.err && k !== 'C' && k !== 'CE') return;
+    const ops = ['+', '−', '×', '÷'];
+    if (/^[0-9.]$/.test(k)) {
+      if (calc.justEval) calc.expr = '';
+      const t = trailingNum(); if (k === '.' && t && t.includes('.')) return;
+      if (calc.expr.length < 40) calc.expr += k;
+    } else if (ops.includes(k)) {
+      if (!calc.expr) { if (k === '−') calc.expr = '−'; }
+      else if (ops.includes(calc.expr.slice(-1))) calc.expr = calc.expr.slice(0, -1) + k;
+      else calc.expr += k;
+    } else if (k === '(') { if (calc.justEval) calc.expr = ''; calc.expr += '('; }
+    else if (k === ')') calc.expr += ')';
+    else if (k === 'C') { calc.expr = ''; calc.err = false; }
+    else if (k === 'CE') { calc.err = false; const t = trailingNum(); calc.expr = t ? calc.expr.slice(0, -t.length) : calc.expr.slice(0, -1); }
+    else if (k === '±') { const t = trailingNum(); if (t) { const before = calc.expr.slice(0, -t.length); calc.expr = before + (t.startsWith('-') ? t.slice(1) : (before && !/[(+−×÷]$/.test(before) ? t : '-' + t)); } }
+    else if (k === '√') {
+      // square root of the number being typed, or of the whole expression's value
+      const t = trailingNum();
+      const partial = !!t && calc.expr.length > t.length && /[+−×÷(]$/.test(calc.expr.slice(0, -t.length));
+      let v; try { v = calcEval(partial ? t : (calc.expr || '0')); } catch (e) { calc.err = true; return calcDisplay(); }
+      const r = v < 0 ? 'Error' : calcFmt(Math.sqrt(v));
+      if (r === 'Error') { calc.err = true; return calcDisplay(); }
+      calc.expr = partial ? calc.expr.slice(0, -t.length) + r : r;
+      calc.justEval = !partial; return calcDisplay();
+    } else if (k === '=' || k === 'M+') {
+      let v; try { v = calcEval(calc.expr || '0'); } catch (e) { calc.err = true; return calcDisplay(); }
+      if (k === 'M+') { calc.mem += v; calcDisplay(); return toast('Added to memory'); }
+      const r = calcFmt(v); if (r === 'Error') calc.err = true; else calc.expr = r;
+      calc.justEval = true; return calcDisplay();
+    } else if (k === 'MR') { if (calc.justEval || !calc.expr || /[+−×÷(]$/.test(calc.expr)) { if (calc.justEval) calc.expr = ''; calc.expr += calcFmt(calc.mem); } }
+    else if (k === 'MC') calc.mem = 0;
+    else if (k === 'xfer') {
+      const inp = $('#numIn'); if (!inp || inp.disabled) return toast('Transfer works on numeric-entry questions.');
+      inp.value = calc.err ? '' : (calc.expr || '0'); inp.dispatchEvent(new Event('input')); return toast('Transferred to answer box');
+    }
+    calc.justEval = false; calcDisplay();
+  }
+  function toggleCalc(force) {
+    calc.open = force != null ? force : !calc.open;
+    let el = $('#calc');
+    if (!calc.open) { if (el) el.remove(); return; }
+    if (el) return;
+    el = document.createElement('div'); el.id = 'calc'; el.className = 'calc'; el.tabIndex = 0;
+    const keys = [['MR', 'MC', 'M+', 'C'], ['(', ')', 'CE', '÷'], ['7', '8', '9', '×'], ['4', '5', '6', '−'], ['1', '2', '3', '+'], ['±', '0', '.', '√']];
+    el.innerHTML = `<div class="calc-head" id="calcHead"><span>Calculator</span><button class="calc-x" data-ck="close" aria-label="Close calculator">✕</button></div>
+      <div class="calc-disp"><span id="calcMem" class="calc-mem"></span><span id="calcDisp">0</span></div>
+      <div class="calc-keys">${keys.flat().map((k) => `<button data-ck="${k}" class="${/[0-9.]/.test(k) ? 'n' : ['C', 'CE'].includes(k) ? 'c' : ''}">${k}</button>`).join('')}<button data-ck="=" class="eq">=</button></div>
+      <button class="calc-xfer" data-ck="xfer">Transfer Display</button>`;
+    document.body.appendChild(el);
+    el.onclick = (ev) => { const b = ev.target.closest('[data-ck]'); if (!b) return; if (b.dataset.ck === 'close') return toggleCalc(false); calcPress(b.dataset.ck); };
+    el.onkeydown = (ev) => {
+      const m = { '*': '×', '/': '÷', '-': '−', '+': '+', Enter: '=', '=': '=', Backspace: 'CE', Escape: 'C', '(': '(', ')': ')', '.': '.' };
+      const k = /^[0-9]$/.test(ev.key) ? ev.key : m[ev.key]; if (!k) return;
+      ev.preventDefault(); ev.stopPropagation(); calcPress(k);
+    };
+    let drag = null;
+    $('#calcHead').onpointerdown = (ev) => { if (ev.target.closest('button')) return; const r = el.getBoundingClientRect(); drag = { dx: ev.clientX - r.left, dy: ev.clientY - r.top }; el.setPointerCapture(ev.pointerId); };
+    el.onpointermove = (ev) => { if (!drag) return; el.style.left = Math.max(0, Math.min(innerWidth - el.offsetWidth, ev.clientX - drag.dx)) + 'px'; el.style.top = Math.max(0, Math.min(innerHeight - 60, ev.clientY - drag.dy)) + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto'; };
+    el.onpointerup = () => { drag = null; };
+    calcDisplay(); el.focus();
   }
 
   // ----- mock test -----
@@ -583,6 +742,7 @@
       <div class="dash-head">
         <div class="logo" style="width:56px;height:56px;font-size:24px;border-radius:16px">📚</div>
         <div><h1>GRE Quant · 30-day plan</h1><div class="muted">One topic a day: read the lesson, then do the exercises.</div></div>
+        <span class="spacer"></span><a class="btn ghost" href="#/formulas">📄 Formula sheet</a>
       </div>
       <div class="card pad learn-hero">
         <div style="flex:1;min-width:240px">
@@ -649,7 +809,7 @@
         <select id="btopic"><option value="">All topics</option>${e.topics.map((t) => `<option ${f.topic === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
         <select id="bdiff"><option value="">Any difficulty</option>${[1, 2, 3].map((d) => `<option value="${d}" ${f.diff == d ? 'selected' : ''}>${DIFF_LABEL[d]}</option>`).join('')}</select>
         <select id="btype"><option value="">All types</option>${typesOf(ex).map((t) => `<option value="${t}" ${f.type === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`).join('')}</select>
-        <select id="bstatus"><option value="">Any status</option>${[['new', 'Not attempted'], ['right', 'Correct last time'], ['wrong', 'Wrong last time'], ['flag', 'Flagged']].map(([v, l]) => `<option value="${v}" ${f.status === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        <select id="bstatus"><option value="">Any status</option>${[['new', 'Not attempted'], ['right', 'Correct last time'], ['wrong', 'Wrong last time'], ['flag', 'Flagged'], ['note', 'Has my note'], ['srs', 'In spaced review']].map(([v, l]) => `<option value="${v}" ${f.status === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
       </div>
       <div id="bankOut"></div>`;
     const out = $('#bankOut');
@@ -664,6 +824,8 @@
         if (f.status === 'right' && !(a && a.last)) return false;
         if (f.status === 'wrong' && !(a && !a.last)) return false;
         if (f.status === 'flag' && !store.flags[p.id]) return false;
+        if (f.status === 'note' && !(store.notes && store.notes[p.id])) return false;
+        if (f.status === 'srs' && !(store.srs && store.srs[p.id])) return false;
         if (q && !(p.skill.toLowerCase().includes(q) || plain(p.q + ' ' + (p.qa || '') + ' ' + (p.qb || '')).toLowerCase().includes(q) || p.id.toLowerCase() === q)) return false;
         return true;
       });
@@ -674,7 +836,7 @@
       const slice = list.slice(f.page * per, f.page * per + per);
       out.innerHTML = list.length ? `
         <div class="row" style="margin-bottom:12px"><span class="muted">${list.length.toLocaleString()} question${list.length === 1 ? '' : 's'}</span><span class="spacer"></span><button class="btn sm ${ex === 'sat' ? 'sat' : ''}" id="practiceFiltered">Practice ${Math.min(20, list.length)} of these</button></div>
-        <div class="card bank-list">${slice.map((p) => { const a = store.att[p.id]; return `<div class="review-item" data-id="${p.id}"><span class="tiny">#${p.id}</span><div><div class="pv">${esc(plain(p.type === 'qc' ? `Compare: ${p.q ? p.q + ' · ' : ''}${p.qa}  vs  ${p.qb}` : p.q))}</div><span class="tiny">${esc(p.topic)} · ${esc(p.skill)} · ${TYPE_LABEL[p.type]} · ${DIFF_LABEL[p.diff]}${store.flags[p.id] ? ' · ⚑' : ''}</span></div>${a ? `<span class="pill ${a.last ? 'ok' : 'bad'}">${a.last ? 'Correct' : 'Missed'}</span>` : '<span class="pill">New</span>'}</div>`; }).join('')}</div>
+        <div class="card bank-list">${slice.map((p) => { const a = store.att[p.id]; return `<div class="review-item" data-id="${p.id}"><span class="tiny">#${p.id}</span><div><div class="pv">${esc(plain(p.type === 'qc' ? `Compare: ${p.q ? p.q + ' · ' : ''}${p.qa}  vs  ${p.qb}` : p.q))}</div><span class="tiny">${esc(p.topic)} · ${esc(p.skill)} · ${TYPE_LABEL[p.type]} · ${DIFF_LABEL[p.diff]}${store.flags[p.id] ? ' · ⚑' : ''}${store.notes && store.notes[p.id] ? ' · 📝' : ''}</span></div>${a ? `<span class="pill ${a.last ? 'ok' : 'bad'}">${a.last ? 'Correct' : 'Missed'}</span>` : '<span class="pill">New</span>'}</div>`; }).join('')}</div>
         <div class="pager"><button class="btn ghost sm" data-pg="-1" ${f.page ? '' : 'disabled'}>← Prev</button><span class="tiny">Page ${f.page + 1} of ${pages}</span><button class="btn ghost sm" data-pg="1" ${f.page < pages - 1 ? '' : 'disabled'}>Next →</button></div>`
         : '<div class="card empty"><div class="big">🔍</div><p>No questions match these filters.</p></div>';
       out.onclick = (ev) => {
@@ -696,18 +858,24 @@
     const totalDone = Object.values(store.days).reduce((a, b) => a + b, 0);
     app.innerHTML = `
       <div class="dash-head"><div><h1>Your progress</h1><div class="muted">Saved in this browser. No account needed.</div></div><span class="spacer"></span><button class="btn ghost sm" id="resetBtn">Reset progress</button></div>
+      <div class="card pad backup">
+        <div style="flex:1;min-width:240px"><h3>💾 Backup &amp; restore</h3><p class="muted" style="margin:6px 0 0">Your progress lives only in this browser. Download a backup file regularly, and import it to move your progress to another device or browser.${store.lastBackup ? ` Last backup: ${new Date(store.lastBackup).toLocaleDateString()}.` : ' You have not made a backup yet.'}</p></div>
+        <div class="row"><button class="btn" id="expBtn">⬇ Download backup</button><label class="btn ghost" for="impIn">⬆ Import backup</label><input type="file" id="impIn" accept=".json,application/json" hidden></div>
+      </div>
       <div class="grid g4">
         <div class="card stat"><b>${totalDone.toLocaleString()}</b><span>answers submitted</span></div>
         <div class="card stat"><b>${streak()}</b><span>day streak</span></div>
         <div class="card stat"><b>${store.hist.length}</b><span>sessions completed</span></div>
-        <div class="card stat"><b>${Object.keys(store.flags).length}</b><span>flagged questions</span></div>
+        <div class="card stat"><b>${store.mastered || 0}</b><span>mistakes mastered by spaced review</span></div>
       </div>
       <div class="section-title"><h2>Activity · last 90 days</h2></div>
       <div class="card pad"><div class="heat">${days.map((n) => `<i class="${n === 0 ? '' : n < 10 ? 'l1' : n < 25 ? 'l2' : 'l3'}" title="${n} answers"></i>`).join('')}</div></div>
       <div class="grid g2" style="margin-top:18px">${['gre', 'sat'].map((ex) => { const st = examStats(ex); return `<div class="card ${ex === 'sat' ? 'sat-theme' : ''}"><div class="pad" style="padding-bottom:8px"><div class="row"><span class="pill ${ex}">${EXAMS[ex].short}</span><b>${EXAMS[ex].name}</b><span class="spacer"></span><span class="tiny">${st.seen}/${st.total} attempted · ${st.attempts ? st.acc + '% accuracy' : 'no attempts yet'}</span></div></div>${EXAMS[ex].topics.map((t) => { const x = st.topics[t]; return `<div class="topic-row" style="grid-template-columns:1fr 90px 50px"><div class="name">${t}<small>${x.seen}/${x.total} attempted</small></div><div class="bar"><i style="width:${pct(x.c, x.n)}%"></i></div><div class="acc">${x.n ? pct(x.c, x.n) + '%' : '—'}</div></div>`; }).join('')}</div>`; }).join('')}</div>
       <div class="section-title"><h2>Recent sessions</h2></div>
       <div class="card">${store.hist.length ? store.hist.slice(0, 25).map((h) => `<div class="review-item" style="cursor:default"><span class="st ${pct(h.correct, h.total) >= 70 ? 'ok' : 'bad'}">${pct(h.correct, h.total)}</span><div><div class="pv" style="color:var(--ink)"><span class="pill ${h.exam}">${EXAMS[h.exam].short}</span> ${esc(h.title)} · ${h.mode === 'test' ? 'Timed' : 'Practice'}</div><span class="tiny">${new Date(h.date).toLocaleString()} · ${h.correct}/${h.total} correct · ${fmtTime(h.secs)}</span></div><span></span></div>`).join('') : '<div class="empty"><div class="big">📊</div><p>Finish a practice set and your sessions will appear here.</p></div>'}</div>`;
-    $('#resetBtn').onclick = () => { if (confirm('Erase all saved progress, flags and history in this browser? This cannot be undone.')) { store = { att: {}, flags: {}, hist: [], days: {}, learn: {}, mocks: [] }; save(); toast('Progress reset'); viewStats(); } };
+    $('#expBtn').onclick = exportBackup;
+    $('#impIn').onchange = (ev) => { const f = ev.target.files[0]; if (f) importBackup(f); ev.target.value = ''; };
+    $('#resetBtn').onclick = () => { if (confirm('Erase all saved progress, flags and history in this browser? This cannot be undone.')) { store = Object.assign({ att: {}, flags: {}, hist: [], days: {}, learn: {}, mocks: [], srs: {}, notes: {} }, { srsInit: 1 }); save(); toast('Progress reset'); viewStats(); } };
   }
 
   // ---------- theme ----------

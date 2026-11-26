@@ -6,6 +6,7 @@ const S = require('./shared');
 const G = require('./gre');
 const T = require('./sat');
 const H = require('./greHard');
+const F = require('./greFigures');
 
 function hash(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 
@@ -61,6 +62,7 @@ const greEntries = [
   ...Object.entries(G.msTemplates).map(([k, f]) => [k, f, 22]),
   ...Object.entries(G.statTemplates).map(([k, f]) => [k, f, 22]),
   ...Object.entries(H.hardTemplates).map(([k, f]) => [k, f, k === 'hQC' ? 30 : 22]),
+  ...Object.entries(F.figureTemplates).map(([k, f]) => [k, f, 24]),
 ];
 // ---- SAT ----
 const satSkip = new Set(['unitsDigit', 'inclusionExclusion', 'divisors', 'remainders', 'consecutive', 'combinatorics']);
